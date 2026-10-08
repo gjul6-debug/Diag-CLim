@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diag Monosplit</title>
+<meta name="theme-color" content="#14202c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Diag Clim">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;-webkit-text-size-adjust:100%}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : outil de terrain mobile — barre d'étapes collante, une colonne, codes couleur du manifold (BP bleu / HP rouge) */
+:root{
+  --bg:#edf0f2; --surface:#ffffff; --sunk:#f5f7f8; --ink:#141d26; --muted:#5b6772; --line:#d3d9de;
+  --accent:#1d4f7a; --bp:#1e66c8; --hp:#c3301c; --ok:#2c8649; --warn:#a86d12;
+  --bp-soft:rgba(30,102,200,.10); --hp-soft:rgba(195,48,28,.10); --ok-soft:rgba(44,134,73,.11); --warn-soft:rgba(168,109,18,.12);
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1317; --surface:#172027; --sunk:#121a20; --ink:#e5eaee; --muted:#9aa6b0; --line:#2a353e;
+  --accent:#8db8e0; --bp:#62a6ff; --hp:#ff7b67; --ok:#5ec381; --warn:#e2a94b;
+  --bp-soft:rgba(98,166,255,.14); --hp-soft:rgba(255,123,103,.14); --ok-soft:rgba(94,195,129,.14); --warn-soft:rgba(226,169,75,.15);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1317; --surface:#172027; --sunk:#121a20; --ink:#e5eaee; --muted:#9aa6b0; --line:#2a353e;
+  --accent:#8db8e0; --bp:#62a6ff; --hp:#ff7b67; --ok:#5ec381; --warn:#e2a94b;
+  --bp-soft:rgba(98,166,255,.14); --hp-soft:rgba(255,123,103,.14); --ok-soft:rgba(94,195,129,.14); --warn-soft:rgba(226,169,75,.15);
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{max-width:780px;margin:0 auto;padding:10px 16px 0}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand h1{font-size:1.35rem;letter-spacing:.01em}
+.brand .unit{font-family:var(--f-data);font-size:.78rem;color:var(--muted)}
+.steps{display:flex;gap:4px;overflow-x:auto;margin-top:8px;scrollbar-width:none}
+.steps::-webkit-scrollbar{display:none}
+.steps button{flex:1 0 auto;background:none;border:0;border-bottom:3px solid transparent;padding:8px 10px 9px;font-family:var(--f-display);font-weight:600;font-size:.98rem;color:var(--muted);cursor:pointer;white-space:nowrap}
+.steps button .n{font-family:var(--f-data);font-size:.75rem;margin-right:5px;opacity:.75}
+.steps button[aria-current="step"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+main{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:18px 48px}
+section[data-step]{display:grid;gap:16px}
+.lead{color:var(--muted);margin:0;max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:14px;min-width:0}
+.card > h2{font-size:1.15rem}
+.card > h3{font-size:1rem}
+.banner{border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;font-size:.95rem}
+.banner.info{background:var(--bp-soft)}
+.banner.warn{background:var(--warn-soft)}
+.banner.crit{background:var(--hp-soft)}
+.banner b{font-weight:600}
+.banner .grow{flex:1 1 240px;min-width:0}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label.f{display:grid;gap:4px;font-size:.88rem;color:var(--muted);min-width:0}
+label.f span.l{font-weight:500}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 10px;color:var(--ink);font-size:1rem;min-width:0}
+input[type=number]{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+textarea{min-height:90px;resize:vertical}
+
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--sunk);border-radius:999px;padding:7px 13px;cursor:pointer;font-size:.92rem}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface);font-weight:600}
+
+.checks{display:grid;gap:2px}
+.chk{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.chk:first-child{border-top:0}
+.chk .t{min-width:0;font-size:.97rem}
+.chk .h{display:block;font-size:.84rem;color:var(--warn);margin-top:3px}
+.tri{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tri button{border:0;background:var(--sunk);padding:7px 10px;font-size:.84rem;cursor:pointer;font-weight:500;color:var(--muted)}
+.tri button + button{border-left:1px solid var(--line)}
+.tri button[aria-pressed="true"][data-v="ok"]{background:var(--ok-soft);color:var(--ok)}
+.tri button[aria-pressed="true"][data-v="ko"]{background:var(--hp-soft);color:var(--hp)}
+.tri button[aria-pressed="true"][data-v="na"]{background:var(--line);color:var(--ink)}
+
+.meas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.meas label.f .tag{font-family:var(--f-data);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+.tag.bp{color:var(--bp)} .tag.hp{color:var(--hp)} .tag.air{color:var(--muted)}
+
+.ind{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.ind .i{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--sunk);display:grid;gap:2px;min-width:0}
+.ind .i .k{font-size:.82rem;color:var(--muted)}
+.ind .i .v{font-family:var(--f-data);font-size:1.35rem;font-variant-numeric:tabular-nums}
+.ind .i .n{font-size:.78rem;color:var(--muted)}
+.pill{display:inline-block;justify-self:start;font-size:.75rem;font-weight:600;border-radius:999px;padding:2px 9px;letter-spacing:.02em}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.low{background:var(--bp-soft);color:var(--bp)}
+.pill.high{background:var(--hp-soft);color:var(--hp)}
+.pill.na{background:var(--line);color:var(--muted)}
+.i.low{border-color:var(--bp)} .i.high{border-color:var(--hp)}
+
+.verdict{border-radius:12px;padding:18px;display:grid;gap:10px;border:2px solid var(--accent);background:var(--surface)}
+.verdict.panne{border-color:var(--hp)}
+.verdict.orient{border-color:var(--warn)}
+.verdict.normal{border-color:var(--ok)}
+.verdict.block{border-color:var(--warn);background:var(--warn-soft)}
+.verdict .eyebrow{font-family:var(--f-data);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.verdict h2{font-size:1.6rem}
+.verdict p{margin:0}
+ol.why,ul.list{margin:0;padding-left:1.25em;display:grid;gap:6px}
+ol.why li::marker{font-family:var(--f-data);color:var(--muted)}
+.mono{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+
+.nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 16px;cursor:pointer;font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.ghost{background:none}
+.rep{font-family:var(--f-data);font-size:.85rem;min-height:340px;white-space:pre-wrap}
+.small{font-size:.85rem;color:var(--muted)}
+@media (prefers-reduced-motion: no-preference){.steps button,.seg button,.tri button{transition:background .15s,color .15s}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>Diag Monosplit</h1>
+      <span class="unit" id="hdrUnit"></span>
+    </div>
+    <nav class="steps" id="steps" aria-label="Étapes du diagnostic"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="banner info" id="exampleBanner" hidden>
+    <div class="grow"><b>Exemple chargé.</b> Les valeurs montrent un cas de manque de fluide sur un R32. Démarre une vraie intervention avec le bouton.</div>
+    <button class="btn" id="btnNew" type="button">Nouvelle intervention</button>
+  </div>
+
+  <!-- 1 APPAREIL -->
+  <section data-step="1">
+    <p class="lead">Identifie l'appareil et le symptôme. Le fluide et les prises disponibles déterminent les mesures possibles.</p>
+    <div id="fluidWarn"></div>
+    <div class="card">
+      <h2>Intervention</h2>
+      <div class="grid">
+        <label class="f"><span class="l">Client</span><input type="text" id="client"></label>
+        <label class="f"><span class="l">Adresse</span><input type="text" id="adresse"></label>
+        <label class="f"><span class="l">Marque / modèle</span><input type="text" id="marque"></label>
+        <label class="f"><span class="l">Code défaut affiché</span><input type="text" id="code" placeholder="aucun"></label>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Appareil</h2>
+      <div class="grid">
+        <label class="f"><span class="l">Fluide (plaque)</span>
+          <select id="fluide"><option>R32</option><option>R410A</option><option>R407C</option><option>R22</option><option>Autre</option></select></label>
+        <label class="f"><span class="l">Charge plaque (g)</span><input type="number" id="charge" inputmode="decimal"></label>
+        <label class="f"><span class="l">Intensité nominale plaque (A)</span><input type="number" id="iplaque" inputmode="decimal" step="0.1"></label>
+      </div>
+      <div class="grid">
+        <div class="f"><span class="l small">Type</span><div class="seg" data-seg="type"><button type="button" data-v="froid">Froid seul</button><button type="button" data-v="reversible">Réversible</button></div></div>
+        <div class="f"><span class="l small">Compresseur</span><div class="seg" data-seg="inverter"><button type="button" data-v="oui">Inverter</button><button type="button" data-v="non">Tout ou rien</button></div></div>
+        <div class="f"><span class="l small">Détendeur</span><div class="seg" data-seg="detendeur"><button type="button" data-v="capillaire">Capillaire</button><button type="button" data-v="electronique">Électronique</button></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Symptôme déclaré</h2>
+      <div class="seg" data-seg="symptome">
+        <button type="button" data-v="froid">Pas assez de froid</button>
+        <button type="button" data-v="chaud">Pas de chaud (froid OK)</button>
+        <button type="button" data-v="arret">S'arrête / se met en défaut</button>
+        <button type="button" data-v="demarre">Ne démarre pas</button>
+        <button type="button" data-v="eau">Fuite d'eau</button>
+        <button type="button" data-v="bruit">Bruit / givre anormal</button>
+      </div>
+    </div>
+    <div class="nav"><span></span><button class="btn primary" type="button" data-go="2">Contrôles →</button></div>
+  </section>
+
+  <!-- 2 CONTROLES -->
+  <section data-step="2" hidden>
+    <p class="lead">Contrôles sans manomètre. Corrige tout de suite ce qui est trivial, relance un essai, puis passe aux relevés. Chaque anomalie est reportée dans le diagnostic et le rapport.</p>
+    <div id="checkGroups"></div>
+    <div class="nav"><button class="btn ghost" type="button" data-go="1">← Appareil</button><button class="btn primary" type="button" data-go="3">Relevés →</button></div>
+  </section>
+
+  <!-- 3 RELEVES -->
+  <section data-step="3" hidden>
+    <p class="lead">Mode froid, ventilateur intérieur en grande vitesse, compresseur à pleine charge (mode test sur Inverter), 15 min de stabilisation. Thermomètres à pince sur cuivre nu.</p>
+    <div class="card">
+      <h2>Matériel de mesure</h2>
+      <div class="seg" data-seg="mode">
+        <button type="button" data-v="bphp">Manos BP + HP</button>
+        <button type="button" data-v="bp">Mano BP seul</button>
+        <button type="button" data-v="temp">Températures seules</button>
+      </div>
+      <p class="small" id="modeNote" style="margin:0"></p>
+    </div>
+    <div class="card">
+      <h3>Air</h3>
+      <div class="meas">
+        <label class="f"><span class="tag air">Air</span><span class="l">Reprise UI (°C)</span><input type="number" id="m_trep" inputmode="decimal" step="0.1"></label>
+        <label class="f"><span class="tag air">Air</span><span class="l">Soufflage UI (°C)</span><input type="number" id="m_tsouf" inputmode="decimal" step="0.1"></label>
+        <label class="f"><span class="tag air">Air</span><span class="l">Extérieur, entrée UE (°C)</span><input type="number" id="m_text" inputmode="decimal" step="0.1"></label>
+      </div>
+      <h3>Fluide</h3>
+      <div class="meas">
+        <label class="f" data-need="bp"><span class="tag bp">BP</span><span class="l" id="lbl_t0">T évaporation lue au mano (°C)</span><input type="number" id="m_t0" inputmode="decimal" step="0.1"></label>
+        <label class="f" data-need="hp"><span class="tag hp">HP</span><span class="l" id="lbl_tk">T condensation lue au mano (°C)</span><input type="number" id="m_tk" inputmode="decimal" step="0.1"></label>
+        <label class="f"><span class="tag bp">Tube gaz</span><span class="l">T aspiration, sortie évapo (°C)</span><input type="number" id="m_tasp" inputmode="decimal" step="0.1"></label>
+        <label class="f"><span class="tag hp">Tube liquide</span><span class="l">T liquide sortie condenseur (°C)</span><input type="number" id="m_tliq" inputmode="decimal" step="0.1"></label>
+        <label class="f"><span class="tag hp">Tube liquide</span><span class="l">T liquide entrée UI / après filtre (°C)</span><input type="number" id="m_tui" inputmode="decimal" step="0.1"></label>
+      </div>
+      <h3>Électrique</h3>
+      <div class="meas">
+        <label class="f"><span class="tag air">Pince</span><span class="l">Intensité UE en marche (A)</span><input type="number" id="m_icomp" inputmode="decimal" step="0.1"></label>
+        <label class="f"><span class="tag air">Volt</span><span class="l">Tension en marche (V)</span><input type="number" id="m_u" inputmode="decimal" step="1"></label>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Indicateurs calculés</h2>
+      <div class="ind" id="indicators"></div>
+      <p class="small" style="margin:0">Valeurs normales issues du manuel Frigobase (R22, R407C, R410A, détendeur capillaire). À recouper avec la notice pour le R32 et les détendeurs électroniques.</p>
+    </div>
+    <div class="nav"><button class="btn ghost" type="button" data-go="2">← Contrôles</button><button class="btn primary" type="button" data-go="4">Diagnostic →</button></div>
+  </section>
+
+  <!-- 4 DIAGNOSTIC -->
+  <section data-step="4" hidden>
+    <div id="diagOut"></div>
+    <div class="nav"><button class="btn ghost" type="button" data-go="3">← Relevés</button><button class="btn primary" type="button" data-go="5">Rapport →</button></div>
+  </section>
+
+  <!-- 5 RAPPORT -->
+  <section data-step="5" hidden>
+    <p class="lead">Rapport généré à partir de la saisie. Ajoute les travaux réalisés, puis copie le texte dans ton rapport d'intervention ou ton mail client.</p>
+    <div class="card">
+      <label class="f"><span class="l">Travaux réalisés / pièces</span><textarea id="travaux" placeholder="Ex. : nettoyage filtres et batterie, recherche de fuite au détecteur, réfection du raccord flare liquide…"></textarea></label>
+    </div>
+    <div class="card">
+      <div class="nav" style="align-items:center"><h2>Compte rendu</h2><button class="btn primary" type="button" id="btnCopy">Copier le texte</button></div>
+      <textarea id="report" class="rep" readonly></textarea>
+      <p class="small" id="copyMsg" style="margin:0" aria-live="polite"></p>
+    </div>
+    <div class="nav"><button class="btn ghost" type="button" data-go="4">← Diagnostic</button><button class="btn" type="button" id="btnNew2">Nouvelle intervention</button></div>
+  </section>
+</main>
+
+<script>
+(function(){
+const STEPS=[["1","Appareil"],["2","Contrôles"],["3","Relevés"],["4","Diagnostic"],["5","Rapport"]];
+const KEY="diag-monosplit-v1";
+
+const CHECKS=[
+ {g:"Sécurité",items:[
+  ["epi","EPI : gants, lunettes, accès UE sécurisé"],
+  ["consign","Disjoncteur identifié, consignation avant ouverture des capots"],
+  ["decharge","Inverter / condensateurs : décharge vérifiée avant de toucher","Ne pas intervenir sur la carte tant que la décharge n'est pas confirmée à la mesure."],
+  ["habil","Attestation de capacité / aptitude pour manipuler le fluide","Sans habilitation : diagnostic en températures seules, puis partenaire certifié pour le circuit frigorifique."]
+ ]},
+ {g:"Commande",items:[
+  ["mode","Mode et consigne corrects (pas en déshu / auto, consigne sous l'ambiance)","Corriger le mode ou la consigne et refaire un essai avant tout diagnostic."],
+  ["telec","Télécommande et piles OK","Remplacer les piles ou tester avec une autre télécommande."],
+  ["codelu","Code défaut relevé et traduit avec la notice service","Un code oriente, il ne prouve rien : vérifier le composant désigné avant de le remplacer."]
+ ]},
+ {g:"Unité intérieure",items:[
+  ["filtres","Filtres propres et en place","Filtres sales : nettoyer, laisser stabiliser 15 min et refaire les relevés. Première cause de manque de puissance."],
+  ["batint","Batterie intérieure propre, ailettes en bon état","Batterie encrassée (graisse, laque, nicotine) : nettoyage, symptômes d'évaporateur trop petit."],
+  ["turbine","Turbine : tourne, ne patine pas, propre","Turbine qui patine ou encrassée : manque de débit d'air, BP basse et surchauffe basse."],
+  ["souffl","Soufflage dégagé, pas de recyclage vers la reprise","Recyclage d'air froid : BP qui baisse, risque de givrage de l'évaporateur."],
+  ["condint","Condensats : bac, évacuation, pompe OK","Fuite d'eau : bac, pente, siphon, pompe de relevage, niveau de l'unité."]
+ ]},
+ {g:"Unité extérieure",items:[
+  ["batext","Batterie extérieure propre (feuilles, poussière, graisse)","Condenseur sale : HP haute, sous-refroidissement bas. Nettoyer puis re-mesurer."],
+  ["degag","Dégagements respectés, pas de recyclage d'air chaud","Recyclage d'air chaud (mur trop proche, coffrage, plein soleil) : HP haute."],
+  ["helice","Hélice : bon sens, centrée, fixée","Hélice qui patine ou tourne à l'envers : manque d'air au condenseur, HP haute."],
+  ["carros","Carrosserie complète et fermée","Carrosserie ouverte : l'air contourne la batterie, HP haute."],
+  ["huile","Raccords et vannes sans trace d'huile","Trace d'huile = fuite probable à cet endroit. Contrôler au détecteur."],
+  ["bouch","Bouchons de vannes et de prises présents","Bouchon absent : vérifier l'étanchéité de la valve."]
+ ]},
+ {g:"Électrique",items:[
+  ["tension","Tension correcte, pas de chute forte au démarrage","Chute de tension : section ou serrage du câble d'alimentation à reprendre."],
+  ["serrage","Serrages des borniers, pas de trace de chauffe","Bornier chauffé : refaire les connexions, contrôler l'intensité."],
+  ["comm","Liaison UI / UE : repérage et continuité OK","Défaut de communication : câblage, inversion, continuité avant de suspecter une carte."],
+  ["condo","Condensateurs dans la tolérance gravée","Condensateur hors tolérance ou gonflé : remplacer à l'identique (µF et tension)."],
+  ["sondes","Sondes CTN conformes à la table constructeur","Sonde hors table : remplacer la sonde, vérifier sa fixation et son connecteur."]
+ ]},
+ {g:"Conditions de mesure",items:[
+  ["cond_mode","Mode froid, ventilo GV, mode test / consigne mini","Mesures hors pleine charge : valeurs non interprétables sur un Inverter."],
+  ["stab","Stabilisé 15 min compresseur en marche","Pas stabilisé : attendre avant de conclure."],
+  ["givre","Évaporateur non givré (ou dégivré complètement)","Évaporateur givré : arrêter le froid, ventiler jusqu'au dégivrage complet, puis refaire les relevés."],
+  ["limites","Températures int. / ext. dans les limites de la notice","Hors limites de fonctionnement : les valeurs normales ne s'appliquent pas."]
+ ]}
+];
+
+const EXAMPLE={
+ example:true, step:"1",
+ client:"Exemple — Mme Martin", adresse:"Toulouse", marque:"Split mural 3,5 kW", code:"", fluide:"R32", charge:"1000", iplaque:"5.2",
+ type:"reversible", inverter:"oui", detendeur:"electronique", symptome:"froid", mode:"bphp",
+ checks:{epi:"ok",consign:"ok",decharge:"ok",habil:"ok",mode:"ok",telec:"ok",filtres:"ok",batint:"ok",turbine:"ok",souffl:"ok",condint:"ok",batext:"ok",degag:"ok",helice:"ok",huile:"ko",cond_mode:"ok",stab:"ok",givre:"ok",limites:"ok"},
+ m:{trep:"26",tsouf:"19",text:"30",t0:"2",tk:"38",tasp:"18",tliq:"37",tui:"36.8",icomp:"3.1",u:"228"},
+ travaux:""
+};
+const BLANK=()=>({example:false,step:"1",client:"",adresse:"",marque:"",code:"",fluide:"R32",charge:"",iplaque:"",type:"reversible",inverter:"oui",detendeur:"electronique",symptome:"froid",mode:"bphp",checks:{},m:{trep:"",tsouf:"",text:"",t0:"",tk:"",tasp:"",tliq:"",tui:"",icomp:"",u:""},travaux:""});
+
+let S;
+try{const raw=localStorage.getItem(KEY); S=raw?JSON.parse(raw):null;}catch(e){S=null}
+if(!S||!S.m) S=JSON.parse(JSON.stringify(EXAMPLE));
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+const $=id=>document.getElementById(id);
+const num=v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
+const f1=n=>n==null?"—":(Math.round(n*10)/10).toLocaleString("fr-FR",{minimumFractionDigits:0,maximumFractionDigits:1});
+
+/* ---------- navigation ---------- */
+const stepsNav=$("steps");
+STEPS.forEach(([n,l])=>{const b=document.createElement("button");b.type="button";b.dataset.go=n;b.innerHTML='<span class="n">'+n+'</span>'+l;stepsNav.appendChild(b)});
+function go(n){S.step=n;save();render()}
+document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);window.scrollTo({top:0})}});
+
+/* ---------- fields ---------- */
+["client","adresse","marque","code","fluide","charge","iplaque","travaux"].forEach(id=>{
+  const el=$(id);el.addEventListener("input",()=>{S[id]=el.value;S.example=false;save();renderLive()});
+});
+Object.keys(BLANK().m).forEach(k=>{const el=$("m_"+k);el.addEventListener("input",()=>{S.m[k]=el.value;S.example=false;save();renderLive()})});
+document.querySelectorAll("[data-seg]").forEach(seg=>{
+  seg.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S[seg.dataset.seg]=b.dataset.v;S.example=false;save();render()});
+});
+function newIntervention(){S=BLANK();save();render();window.scrollTo({top:0})}
+$("btnNew").addEventListener("click",newIntervention);$("btnNew2").addEventListener("click",newIntervention);
+
+/* ---------- checks ---------- */
+function buildChecks(){
+  const wrap=$("checkGroups");wrap.innerHTML="";
+  CHECKS.forEach(grp=>{
+    const card=document.createElement("div");card.className="card";
+    const h=document.createElement("h2");h.textContent=grp.g;card.appendChild(h);
+    const list=document.createElement("div");list.className="checks";
+    grp.items.forEach(([id,label,hint])=>{
+      const v=S.checks[id]||"";
+      const row=document.createElement("div");row.className="chk";
+      const t=document.createElement("div");t.className="t";t.textContent=label;
+      if(v==="ko"&&hint){const s=document.createElement("span");s.className="h";s.textContent=hint;t.appendChild(s)}
+      const tri=document.createElement("div");tri.className="tri";tri.setAttribute("role","group");tri.setAttribute("aria-label",label);
+      [["ok","OK"],["ko","Anomalie"],["na","N/A"]].forEach(([val,txt])=>{
+        const b=document.createElement("button");b.type="button";b.dataset.v=val;b.textContent=txt;b.setAttribute("aria-pressed",String(v===val));
+        b.addEventListener("click",()=>{S.checks[id]=(S.checks[id]===val?"":val);S.example=false;save();buildChecks();renderLive()});
+        tri.appendChild(b)});
+      row.append(t,tri);list.appendChild(row)});
+    card.appendChild(list);wrap.appendChild(card)});
+}
+function anomalies(){const out=[];CHECKS.forEach(g=>g.items.forEach(([id,l,h])=>{if(S.checks[id]==="ko")out.push({id,g:g.g,l,h})}));return out}
+
+/* ---------- calculs ---------- */
+function compute(){
+  const m={};Object.keys(S.m).forEach(k=>m[k]=num(S.m[k]));
+  const hasBP=S.mode!=="temp", hasHP=S.mode==="bphp";
+  const r={m,hasBP,hasHP};
+  const cls=(v,lo,hi)=>v==null?"na":v<lo?"low":v>hi?"high":"ok";
+  r.dEvap = hasBP&&m.trep!=null&&m.t0!=null ? m.trep-m.t0 : null;
+  r.dCond = hasHP&&m.tk!=null&&m.text!=null ? m.tk-m.text : null;
+  r.sc    = hasBP&&m.tasp!=null&&m.t0!=null ? m.tasp-m.t0 : null;
+  r.sr    = hasHP&&m.tk!=null&&m.tliq!=null ? m.tk-m.tliq : null;
+  r.dAir  = m.trep!=null&&m.tsouf!=null ? m.trep-m.tsouf : null;
+  r.dLL   = m.tliq!=null&&m.tui!=null ? m.tliq-m.tui : null;
+  r.liqExt= m.tliq!=null&&m.text!=null ? m.tliq-m.text : null;
+  const ip=num(S.iplaque); r.iRatio = m.icomp!=null&&ip ? m.icomp/ip : null;
+  /* BP : ΔT total évapo 16-20 → au-delà de 20 = BP basse */
+  r.bp = r.dEvap==null?"na":r.dEvap>20?"low":r.dEvap<16?"high":"ok";
+  r.hp = r.dCond==null?"na":r.dCond>20?"high":r.dCond<10?"low":"ok";
+  r.scS = cls(r.sc,5,10);
+  r.srS = cls(r.sr,4,7);
+  r.airS= cls(r.dAir,8,10);
+  r.llS = r.dLL==null?"na":r.dLL>1?"high":"ok";
+  r.liqExtS = r.liqExt==null?"na":r.liqExt<5?"low":r.liqExt>15?"high":"ok";
+  r.iS = r.iRatio==null?"na":r.iRatio>1.05?"high":"ok";
+  return r;
+}
+const WORD={ok:"normal",low:"bas",high:"haut",na:"non mesuré"};
+function indicatorList(r){
+  const L=[];
+  if(r.hasBP) L.push(["Basse pression","ΔT total évapo",r.dEvap,"16–20 °C",r.bp,{low:"BP basse",high:"BP haute",ok:"BP normale",na:"non mesuré"}]);
+  if(r.hasHP) L.push(["Haute pression","ΔT total condenseur",r.dCond,"10–20 °C",r.hp,{low:"HP basse",high:"HP haute",ok:"HP normale",na:"non mesuré"}]);
+  if(r.hasBP) L.push(["Surchauffe","T asp. − T évap.",r.sc,"5–10 °C",r.scS,null]);
+  if(r.hasHP) L.push(["Sous-refroidissement","T cond. − T liquide",r.sr,"4–7 °C",r.srS,null]);
+  L.push(["ΔT air évaporateur","reprise − soufflage",r.dAir,"8–10 °C en GV",r.airS,null]);
+  L.push(["ΔT ligne liquide","sortie cond. − entrée UI",r.dLL,"< 1 °C",r.llS,{ok:"normal",high:"obstruction",na:"non mesuré"}]);
+  if(!r.hasHP) L.push(["Ligne liquide − extérieur","estimation HP",r.liqExt,"≈ +10 °C",r.liqExtS,{low:"HP basse prob.",high:"HP haute prob.",ok:"cohérent",na:"non mesuré"}]);
+  L.push(["Intensité / plaque","pince UE",r.iRatio==null?null:r.iRatio*100,"≤ 100 %",r.iS,{ok:"normal",high:"surintensité",na:"non mesuré"},"%"]);
+  return L;
+}
+function renderIndicators(r){
+  const box=$("indicators");box.innerHTML="";
+  indicatorList(r).forEach(([k,sub,v,norm,st,words,unit])=>{
+    const d=document.createElement("div");d.className="i "+st;
+    const w=(words&&words[st])||WORD[st];
+    d.innerHTML='<span class="k"></span><span class="v"></span><span class="n"></span><span class="pill '+st+'"></span>';
+    d.children[0].textContent=k;
+    d.children[1].textContent=v==null?"—":f1(v)+(unit?" "+unit:" °C");
+    d.children[2].textContent=sub+" · normal "+norm;
+    d.children[3].textContent=w;
+    box.appendChild(d)});
+}
+
+/* ---------- diagnostic ---------- */
+function diagnose(r){
+  const an=anomalies();
+  const D={kind:"panne",eyebrow:"",title:"",summary:"",why:[],confirm:[],actions:[],notes:[]};
+  const v=(x)=>f1(x)+" °C";
+  // préalables bloquants
+  if(S.checks.givre==="ko"){return {kind:"block",eyebrow:"Diagnostic suspendu",title:"Évaporateur givré",summary:"Le givre fausse toutes les mesures BP. Arrête le froid, laisse tourner la ventilation jusqu'au dégivrage complet, puis refais les relevés.",why:[],confirm:[],actions:["Dégivrage complet en ventilation seule","Refaire les relevés de l'étape 3"],notes:[]}}
+  const notes=[];
+  if(S.checks.stab!=="ok") notes.push("Stabilisation de 15 min non confirmée : résultats à prendre avec prudence.");
+  if(S.checks.cond_mode!=="ok"&&S.inverter==="oui") notes.push("Mode test / pleine charge non confirmé sur un Inverter : un compresseur au ralenti donne des valeurs trompeuses.");
+  if(S.detendeur==="electronique") notes.push("Détendeur électronique : la carte règle la surchauffe. Une surchauffe anormale vise d'abord le détendeur, sa bobine ou ses sondes, puis la charge.");
+  if(S.fluide==="R407C") notes.push("R407C : surchauffe calculée sur la température de rosée, sous-refroidissement sur la température de bulle.");
+  const airFix=an.filter(a=>["filtres","batint","turbine","souffl","batext","degag","helice","carros"].includes(a.id));
+  if(airFix.length) notes.push("Anomalie d'échange d'air notée ("+airFix.map(a=>a.l.split(" (")[0].split(":")[0]).join(", ")+") : la corriger et re-mesurer avant de conclure sur le circuit frigorifique.");
+  D.notes=notes;
+
+  if(S.symptome==="chaud"){
+    return Object.assign(D,{kind:"orient",eyebrow:"Mode chaud",title:"Vérifier la chaîne d'inversion de cycle",
+      summary:"Le froid fonctionne, le chaud non : le circuit commun est sain, la panne est dans ce qui ne sert qu'en chaud.",
+      why:["Commande réellement en chaud, consigne au-dessus de l'ambiance ; préchauffage normal de quelques minutes avant le ventilateur intérieur.",
+           "Dégivrage en cours ? Unité intérieure arrêtée, vapeur sur l'UE : normal s'il ne se répète pas sans cesse.",
+           "Bobine de vanne 4 voies : alimentée dans le bon mode (voir schéma), résistance, connecteur. Test : pince ampèremétrique ouverte approchée. Ne jamais la sortir de sa cheminée sous tension.",
+           "Tiroir de V4V : bascule seulement avec un écart HP/BP suffisant (≈ 1 bar), compresseur en marche depuis quelques minutes.",
+           "V4V bloquée à mi-course : BP haute, HP basse, peu de puissance. Petit coup sec au maillet du côté où le tiroir doit aller, jamais métal sur métal.",
+           "Sondes de dégivrage et d'échangeur : contrôle CTN."],
+      confirm:["Écouter le clic de la bobine à la commutation","Toucher les 4 tubes de la V4V : un corps tiède partout = mi-course"],
+      actions:["Remplacement bobine si coupée","Remplacement V4V : protéger le corps au brasage (téflon), vérifier la position du tiroir avant brasage"]});
+  }
+  if(S.symptome==="demarre"){
+    return Object.assign(D,{kind:"orient",eyebrow:"Ne démarre pas",title:"Remonter la chaîne électrique",
+      summary:"Aucun relevé frigorifique n'est possible tant que le compresseur ne tourne pas : diagnostic électrique d'abord (étape 2, bloc Électrique).",
+      why:["Alimentation : disjoncteur, tension à l'UI et à l'UE, fusible de carte.","Communication UI/UE : repérage des bornes, continuité, code défaut.","Ventilateurs : rotation libre à la main, condensateur, commande carte.","Compresseur : intensité à la pince au démarrage, résistances d'enroulements (C/P/A ou 3 identiques en Inverter), isolement au mégohmmètre 500 V.","Protection thermique : laisser refroidir complètement avant de conclure à un enroulement coupé.","Anti-court-cycle : attendre plusieurs minutes entre deux essais."],
+      confirm:["Code défaut traduit avec la notice service"],
+      actions:["Remplacer à l'identique le composant mis en cause","Rechercher la cause d'une surintensité avant de remplacer un compresseur"]});
+  }
+  if(S.symptome==="eau"){
+    return Object.assign(D,{kind:"orient",eyebrow:"Fuite d'eau",title:"Évacuation des condensats",
+      summary:"La fuite d'eau vient presque toujours de l'évacuation, parfois d'un évaporateur qui givre puis dégèle.",
+      why:["Bac et sortie de bac bouchés (boues, algues).","Pente du tuyau, contre-pente, tuyau écrasé ou siphon absent.","Pompe de relevage : flotteur, alimentation, refoulement.","Unité intérieure pas de niveau.","Givrage de l'évaporateur (filtres sales, manque de fluide) : l'eau déborde au dégel → faire les relevés de l'étape 3."],
+      confirm:["Verser de l'eau dans le bac et suivre l'écoulement"],actions:["Nettoyage du bac et de l'évacuation, reprise de la pente ou de la pompe"]});
+  }
+
+  if(!r.hasBP){
+    // températures seules : orientation
+    const o=[];let title="Orientation sans manomètre";
+    if(r.dAir!=null){ if(r.airS==="low") o.push("ΔT air évaporateur de "+v(r.dAir)+" (normal 8–10 °C) : puissance frigorifique faible."); else if(r.airS==="high") o.push("ΔT air évaporateur de "+v(r.dAir)+" : débit d'air réduit probable (filtres, turbine, batterie)."); else o.push("ΔT air évaporateur de "+v(r.dAir)+" : dans la norme.");}
+    if(r.liqExt!=null){ if(r.liqExtS==="low") o.push("Ligne liquide seulement "+v(r.liqExt)+" au-dessus de l'extérieur (≈ +10 attendu) : HP probablement basse → panne côté BP (manque de fluide, détendeur, pré-détente) ou compresseur faible."); else if(r.liqExtS==="high") o.push("Ligne liquide "+v(r.liqExt)+" au-dessus de l'extérieur : HP probablement haute → condenseur sale ou mal ventilé, excès de charge."); else o.push("Ligne liquide ≈ "+v(r.liqExt)+" au-dessus de l'extérieur : cohérent avec une HP normale.");}
+    if(r.dLL!=null&&r.llS==="high") o.push("ΔT de "+v(r.dLL)+" sur la ligne liquide : obstruction (vanne pas ouverte à fond, filtre colmaté) → pré-détente probable.");
+    if(r.iS==="high") o.push("Intensité au-dessus de la plaque : compresseur en surcharge (HP haute, tension, mécanique).");
+    if(!o.length) o.push("Renseigne au moins les températures d'air et de ligne liquide pour obtenir une orientation.");
+    return Object.assign(D,{kind:"orient",eyebrow:"Températures seules",title,summary:"Sans pression BP, on oriente sans conclure. Pour trancher il faut un relevé BP par un opérateur habilité.",why:o,confirm:["Relevé BP + surchauffe (opérateur habilité)"],actions:[]});
+  }
+
+  // incomplet
+  if(r.dEvap==null){return Object.assign(D,{kind:"block",eyebrow:"Relevés incomplets",title:"Il manque la BP ou la reprise d'air",summary:"Le diagnostic part de la basse pression : renseigne la température de reprise et la température d'évaporation lue au mano.",why:[],confirm:[],actions:[]})}
+
+  const why=[];
+  why.push("ΔT total évaporateur = "+v(r.dEvap)+" → "+(r.bp==="low"?"BP trop basse":r.bp==="high"?"BP haute":"BP normale")+" (normal 16–20 °C).");
+
+  if(r.bp==="low"){
+    if(r.sc==null) return Object.assign(D,{kind:"block",eyebrow:"Panne BP",title:"Mesure la surchauffe",summary:"BP basse confirmée. La surchauffe départage l'évaporateur trop petit des autres pannes BP.",why,confirm:["T aspiration en sortie d'évaporateur"],actions:[]});
+    why.push("Surchauffe = "+v(r.sc)+" → "+WORD[r.scS]+" (normal 5–10 °C).");
+    if(r.scS==="low"){
+      let sub="";
+      if(r.airS==="high"){sub="ΔT air de "+v(r.dAir)+" élevé : manque de débit d'air.";}
+      else if(r.airS==="low"){sub="ΔT air de "+v(r.dAir)+" faible : évaporateur encrassé.";}
+      else sub="ΔT air "+(r.dAir==null?"non mesuré":"de "+v(r.dAir))+" : vérifier filtres, turbine et batterie.";
+      why.push(sub);
+      return Object.assign(D,{eyebrow:"Panne BP",title:"Évaporateur trop petit",summary:"Seule panne BP avec une surchauffe basse : l'évaporateur reçoit du liquide mais l'échange avec l'air se fait mal. "+sub,why,
+        confirm:["Contrôle visuel filtres, turbine, batterie intérieure","Recyclage d'air soufflé vers la reprise"],
+        actions:["Nettoyer filtres / batterie, resserrer la turbine, dégager le soufflage","Refaire les relevés après 15 min","Risque de coups de liquide au compresseur : ne pas laisser tourner en l'état"]});
+    }
+    if(r.hasHP){
+      if(r.sr==null) return Object.assign(D,{kind:"block",eyebrow:"Panne BP",title:"Mesure le sous-refroidissement",summary:"BP basse et surchauffe élevée. Le sous-refroidissement départage le manque de fluide des obstructions.",why,confirm:["T liquide en sortie de condenseur + T condensation"],actions:[]});
+      why.push("Sous-refroidissement = "+v(r.sr)+" → "+WORD[r.srS]+" (normal 4–7 °C).");
+      if(r.srS==="low"){
+        if(r.dLL!=null&&r.llS==="high") why.push("Attention : ΔT de "+v(r.dLL)+" sur la ligne liquide, une pré-détente peut s'ajouter.");
+        return Object.assign(D,{eyebrow:"Panne BP",title:"Manque de fluide",summary:"Le liquide manque dans l'évaporateur et dans le condenseur : il en manque dans tout le circuit. Il y a une fuite.",why,
+          confirm:["Recherche de fuite : raccords flare, vannes de service, prises de pression, zones grasses","Détecteur compatible avec le fluide ("+S.fluide+")"],
+          actions:["Réparer la fuite avant toute charge","Récupération, tirage au vide, charge à la balance au poids plaque (+ complément longueur selon notice)","Pas d'appoint « au jugé »"+(S.fluide==="R407C"?" — en R407C, vidange complète obligatoire (composition modifiée par la fuite)":"")]});
+      }
+    } else {
+      why.push("Pas de mano HP : sous-refroidissement inconnu.");
+      if(r.liqExt!=null) why.push("Ligne liquide "+v(r.liqExt)+" au-dessus de l'extérieur ("+(r.liqExtS==="low"?"HP probablement basse":r.liqExtS==="high"?"HP probablement haute":"cohérent")+").");
+    }
+    if(r.dLL!=null){
+      why.push("ΔT ligne liquide = "+v(r.dLL)+" → "+(r.llS==="high"?"obstruction":"pas d'obstruction")+" (normal < 1 °C).");
+      if(r.llS==="high") return Object.assign(D,{eyebrow:"Panne BP",title:"Pré-détente",summary:"Le liquide est bien présent au condenseur mais un obstacle sur la ligne liquide le fait se vaporiser avant le détendeur.",why,
+        confirm:["Localiser le point froid : vanne liquide, filtre déshydrateur, tube écrasé","Dénivelé UI / UE conforme à la notice ? Ligne liquide exposée au soleil ?"],
+        actions:["Vanne liquide ouverte à fond (siège arrière)","Filtre colmaté : remplacer par un modèle anti-acide + test d'acidité de l'huile","Calorifuger la ligne liquide si elle traverse un endroit chaud"]});
+      if(r.hasHP) return Object.assign(D,{eyebrow:"Panne BP",title:"Détendeur trop petit ou bouché",summary:"Liquide disponible au condenseur, aucune obstruction sur la ligne : c'est le détendeur qui ne laisse pas passer assez de fluide.",why,
+        confirm:["À l'arrêt, égalisation HP/BP lente ou absente = capillaire bouché",S.detendeur==="electronique"?"Détendeur électronique : bobine, connecteur, sondes d'entrée et sortie évapo, ouverture commandée":"Capillaire écrasé ?","HP trop basse par temps froid (régulation de condensation absente) ?"],
+        actions:["Pièce d'origine uniquement (référence exacte de l'appareil)","Circuit pollué : déshydrateur neuf, nettoyage"]});
+    }
+    return Object.assign(D,{kind:"orient",eyebrow:"Panne BP",title:r.hasHP?"Pré-détente ou détendeur":"Manque de fluide, pré-détente ou détendeur",
+      summary:"BP basse et surchauffe élevée. Il manque une mesure pour départager.",why,
+      confirm:[r.hasHP?"":"Mano HP pour le sous-refroidissement (bas = manque de fluide)","T liquide entrée UI pour le ΔT ligne liquide (> 1 °C = pré-détente)"].filter(Boolean),actions:[]});
+  }
+
+  // BP normale ou haute
+  if(r.hasHP&&r.dCond!=null){
+    why.push("ΔT total condenseur = "+v(r.dCond)+" → "+(r.hp==="high"?"HP trop haute":r.hp==="low"?"HP basse":"HP normale")+" (normal 10–20 °C).");
+    if(r.hp==="high"){
+      if(r.sr==null) return Object.assign(D,{kind:"block",eyebrow:"Panne HP",title:"Mesure le sous-refroidissement",summary:"HP haute confirmée. Le sous-refroidissement départage le condenseur saturé de l'excès de charge.",why,confirm:["T liquide sortie condenseur"],actions:[]});
+      why.push("Sous-refroidissement = "+v(r.sr)+" → "+WORD[r.srS]+" (normal 4–7 °C).");
+      if(r.srS==="low") return Object.assign(D,{eyebrow:"Panne HP",title:"Condenseur saturé",summary:"Seule panne HP avec un sous-refroidissement bas : le condenseur n'arrive pas à évacuer la chaleur.",why,
+        confirm:["Batterie extérieure : poussière, feuilles, graisse, ailettes écrasées","Ventilation : hélice (sens, fixation, position), carrosserie fermée","Recyclage d'air chaud : mur proche, coffrage, autre unité en face"],
+        actions:["Nettoyer la batterie (pas de nettoyeur haute pression), peigner les ailettes","Dégager l'unité ou la déplacer","Refaire les relevés"]});
+      return Object.assign(D,{eyebrow:"Panne HP",title:"Excès de charge ou incondensables",summary:"HP haute avec un sous-refroidissement élevé et un condenseur propre. Les deux pannes ont les mêmes symptômes et le même traitement sur un monosplit.",why,
+        confirm:["Condenseur propre et bien ventilé (sinon c'est d'abord lui)","Historique : appoint récent, mise en service sans tirage au vide"],
+        actions:["Récupérer tout le fluide","Test d'acidité de l'huile si possible","Tirage au vide","Charge à la balance au poids plaque (+ complément longueur selon notice)","Contrôle d'étanchéité et relevés de fonctionnement"]});
+    }
+    if(r.bp==="high"&&r.hp==="low") return Object.assign(D,{eyebrow:"Ni BP ni HP",title:"Compresseur faible ou V4V à mi-course",summary:"Seule combinaison BP haute + HP basse : le compresseur ne fait plus circuler assez de fluide, ou la vanne 4 voies court-circuite HP et BP.",why,
+      confirm:[S.type==="reversible"?"Réversible : V4V bloquée à mi-course ? Corps tiède partout, essai de déblocage au maillet":"","Intensité absorbée vs plaque : le moteur tourne-t-il vraiment ?","Bruit anormal, clapet ou palette cassés après coups de liquide"].filter(Boolean),
+      actions:["Compresseur hermétique = remplacement, après avoir trouvé la cause des coups de liquide","Sur appareil ancien : chiffrer le remplacement complet en parallèle"]});
+    if(r.bp==="ok"&&r.hp==="ok"){
+      if(r.sc!=null) why.push("Surchauffe = "+v(r.sc)+" ("+WORD[r.scS]+").");
+      if(r.sr!=null) why.push("Sous-refroidissement = "+v(r.sr)+" ("+WORD[r.srS]+").");
+      return Object.assign(D,{kind:"normal",eyebrow:"Circuit frigorifique",title:"Valeurs dans la norme",summary:"Le circuit frigorifique fonctionne correctement aux conditions de mesure. La plainte vient d'ailleurs.",why,
+        confirm:["Puissance de l'appareil adaptée au local (apports solaires, volume, ouverture)","Régulation : sonde d'ambiance, position de l'UI, consigne","Inverter : le compresseur monte-t-il bien en fréquence hors mode test ?"],
+        actions:["Expliquer le fonctionnement et les limites au client","Proposer un contrat d'entretien"]});
+    }
+  }
+  return Object.assign(D,{kind:"orient",eyebrow:"Hors arbre",title:"Combinaison atypique",summary:"Les relevés ne correspondent à aucune des 8 pannes types. Vérifie les conditions de mesure et la cohérence des relevés.",
+    why:why.concat(r.hasHP?[]:["Pas de mano HP : la branche HP de l'arbre n'est pas exploitable."]),
+    confirm:["Stabilisation, mode test, ventilo GV","Position des thermomètres (cuivre nu, sous l'isolant)","Lecture de la bonne réglette pour le fluide "+S.fluide],actions:[]});
+}
+
+function renderDiag(r){
+  const d=diagnose(r);const out=$("diagOut");out.innerHTML="";
+  const card=document.createElement("div");card.className="verdict "+({panne:"panne",orient:"orient",normal:"normal",block:"block"}[d.kind]||"");
+  const add=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;card.appendChild(e);return e};
+  add("span","eyebrow",d.eyebrow);add("h2",null,d.title);add("p",null,d.summary);
+  out.appendChild(card);
+  const sec=(title,items,ordered)=>{if(!items||!items.length)return;const c=document.createElement("div");c.className="card";const h=document.createElement("h3");h.textContent=title;c.appendChild(h);const l=document.createElement(ordered?"ol":"ul");l.className=ordered?"why":"list";items.forEach(t=>{const li=document.createElement("li");li.textContent=t;l.appendChild(li)});c.appendChild(l);out.appendChild(c)};
+  sec(d.kind==="orient"&&!r.hasBP?"Ce que disent les relevés":"Raisonnement",d.why,true);
+  sec("Pour confirmer",d.confirm);
+  sec("Actions",d.actions);
+  const an=anomalies();
+  sec("Anomalies notées aux contrôles",an.map(a=>a.l+(a.h?" — "+a.h:"")));
+  if(d.notes&&d.notes.length){d.notes.forEach(n=>{const b=document.createElement("div");b.className="banner warn";b.textContent=n;out.appendChild(b)})}
+  return d;
+}
+
+/* ---------- rapport ---------- */
+const SYMP={froid:"Pas assez de froid",chaud:"Pas de chaud (froid OK)",arret:"S'arrête / se met en défaut",demarre:"Ne démarre pas",eau:"Fuite d'eau",bruit:"Bruit / givre anormal"};
+function buildReport(r,d){
+  const L=[];const today=new Date().toLocaleDateString("fr-FR");
+  L.push("COMPTE RENDU D'INTERVENTION — CLIMATISATION");
+  L.push("Date : "+today);
+  if(S.client)L.push("Client : "+S.client+(S.adresse?" — "+S.adresse:""));
+  L.push("Appareil : "+(S.marque||"monosplit")+" · "+S.fluide+(S.charge?" ("+S.charge+" g)":"")+" · "+(S.type==="reversible"?"réversible":"froid seul")+" · "+(S.inverter==="oui"?"Inverter":"tout ou rien")+" · détendeur "+S.detendeur);
+  L.push("Symptôme déclaré : "+SYMP[S.symptome]+(S.code?" · code défaut "+S.code:""));
+  L.push("");
+  const an=anomalies();
+  L.push("CONTRÔLES");
+  L.push(an.length?an.map(a=>"- "+a.l+" : anomalie").join("\n"):"- Aucune anomalie relevée aux contrôles visuels et électriques.");
+  L.push("");
+  const m=r.m;const p=(lab,x,u)=>x==null?null:"- "+lab+" : "+f1(x)+" "+u;
+  const rel=[p("Air reprise",m.trep,"°C"),p("Air soufflage",m.tsouf,"°C"),p("Air extérieur",m.text,"°C"),r.hasBP?p("T évaporation",m.t0,"°C"):null,r.hasHP?p("T condensation",m.tk,"°C"):null,p("T aspiration",m.tasp,"°C"),p("T liquide sortie condenseur",m.tliq,"°C"),p("T liquide entrée UI",m.tui,"°C"),p("Intensité UE",m.icomp,"A"),p("Tension",m.u,"V")].filter(Boolean);
+  if(rel.length){L.push("RELEVÉS (mode froid)");L.push(rel.join("\n"));L.push("");}
+  const ind=indicatorList(r).filter(x=>x[2]!=null);
+  if(ind.length){L.push("INDICATEURS");ind.forEach(([k,,v,norm,st,words,unit])=>L.push("- "+k+" : "+f1(v)+(unit?" "+unit:" °C")+" ("+((words&&words[st])||WORD[st])+", normal "+norm+")"));L.push("");}
+  L.push("DIAGNOSTIC");
+  L.push(d.title+(d.kind==="orient"?" (orientation)":"")+" — "+d.summary);
+  if(d.actions&&d.actions.length){L.push("");L.push("PRÉCONISATIONS");d.actions.forEach(a=>L.push("- "+a));}
+  if(S.travaux){L.push("");L.push("TRAVAUX RÉALISÉS");L.push(S.travaux);}
+  return L.join("\n");
+}
+$("btnCopy").addEventListener("click",()=>{
+  const t=$("report");const msg=$("copyMsg");
+  navigator.clipboard.writeText(t.value).then(()=>{msg.textContent="Texte copié."}).catch(()=>{t.focus();t.select();msg.textContent="Copie automatique refusée : le texte est sélectionné, copie-le manuellement."});
+});
+
+/* ---------- rendu ---------- */
+function setSeg(name){document.querySelectorAll('[data-seg="'+name+'"] button').forEach(b=>b.setAttribute("aria-pressed",String(S[name]===b.dataset.v)))}
+function renderLive(){
+  const r=compute();renderIndicators(r);const d=renderDiag(r);$("report").value=buildReport(r,d);
+  $("exampleBanner").hidden=!S.example;
+  $("hdrUnit").textContent=[S.fluide,S.type==="reversible"?"réversible":"froid seul",S.inverter==="oui"?"Inverter":""].filter(Boolean).join(" · ");
+  const fw=$("fluidWarn");fw.innerHTML="";
+  const warn=(cls,html)=>{const b=document.createElement("div");b.className="banner "+cls;b.innerHTML='<div class="grow">'+html+'</div>';fw.appendChild(b)};
+  if(S.fluide==="R22")warn("crit","<b>R22 :</b> interdit en maintenance (pas d'appoint possible). Diagnostic oui, mais la solution passe par un remplacement ou une reconversion.");
+  if(S.fluide==="R32")warn("info","<b>R32 :</b> fluide légèrement inflammable (A2L). Outillage compatible, aucune flamme sur circuit chargé.");
+  if(S.checks.habil==="ko"&&S.mode!=="temp")warn("warn","<b>Pas d'habilitation fluide :</b> passe en mode « Températures seules » pour les relevés.");
+}
+function render(){
+  document.querySelectorAll("section[data-step]").forEach(s=>s.hidden=s.dataset.step!==S.step);
+  stepsNav.querySelectorAll("button").forEach(b=>{if(b.dataset.go===S.step)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current")});
+  ["client","adresse","marque","code","fluide","charge","iplaque","travaux"].forEach(id=>{if(document.activeElement!==$(id))$(id).value=S[id]||""});
+  Object.keys(S.m).forEach(k=>{const el=$("m_"+k);if(el&&document.activeElement!==el)el.value=S.m[k]});
+  ["type","inverter","detendeur","symptome","mode"].forEach(setSeg);
+  document.querySelectorAll('[data-need="bp"]').forEach(e=>e.hidden=S.mode==="temp");
+  document.querySelectorAll('[data-need="hp"]').forEach(e=>e.hidden=S.mode!=="bphp");
+  $("lbl_t0").textContent=S.fluide==="R407C"?"T de rosée lue au mano BP (°C)":"T évaporation lue au mano (°C)";
+  $("lbl_tk").textContent=S.fluide==="R407C"?"T de bulle lue au mano HP (°C)":"T condensation lue au mano (°C)";
+  $("modeNote").textContent={bphp:"Diagnostic complet : les 8 pannes types sont identifiables.",bp:"Cas courant sur monosplit (une seule prise sur la vanne gaz). Le sous-refroidissement est remplacé par une estimation via la ligne liquide. Sur un réversible en mode chaud, cette prise lit en général la HP.",temp:"Sans manomètre : orientation seulement. Pour conclure, un relevé BP par un opérateur habilité est nécessaire."}[S.mode];
+  buildChecks();renderLive();
+}
+render();
+})();
+</script>
+
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
+</script>
+</body>
+</html>
